@@ -810,26 +810,9 @@ function GallerySection() {
 }
 
 // ============================================================================
-// RESERVATION SECTION
+// RESERVATION SECTION - TABLEO
 // ============================================================================
 function ReservationSection() {
-  const [formData, setFormData] = useState({ name: '', email: '', phone: '', date: '', time: '', guests: '2', message: '' })
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-    await new Promise(r => setTimeout(r, 1500))
-    const msg = `¡Hola! Quiero hacer una reserva:\n📅 Fecha: ${formData.date}\n🕐 Hora: ${formData.time}\n👥 Personas: ${formData.guests}\n👤 Nombre: ${formData.name}\n📱 Teléfono: ${formData.phone}${formData.message ? `\n💬 ${formData.message}` : ''}`
-    window.open(`https://wa.me/34911661641?text=${encodeURIComponent(msg)}`, '_blank')
-    setIsSubmitting(false)
-    setSubmitted(true)
-    setTimeout(() => { setSubmitted(false); setFormData({ name: '', email: '', phone: '', date: '', time: '', guests: '2', message: '' }) }, 5000)
-  }
-
-  const today = new Date().toISOString().split('T')[0]
-
   return (
     <section id="reservas" className="py-16 sm:py-24 lg:py-32 relative overflow-hidden">
       <div className="absolute inset-0">
@@ -837,14 +820,14 @@ function ReservationSection() {
         <div className="absolute inset-0 bg-black/90" />
       </div>
 
-      <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6">
+      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6">
         <div className="text-center mb-8 sm:mb-12">
           <span className="text-[#c9a227] tracking-[0.2em] uppercase text-xs sm:text-sm">Reserva tu Mesa</span>
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold mt-3 sm:mt-4 mb-4 sm:mb-6">
             <span className="bg-gradient-to-r from-[#c9a227] via-[#e3c453] to-[#c9a227] bg-clip-text text-transparent">Hacer Reserva</span>
           </h2>
           <p className="text-[#b0b0b0] max-w-2xl mx-auto text-sm sm:text-base px-4">
-            Un trocito de Galicia en Madrid. En pleno Sanchinarro disfruta de la mejor comida gallega. Traemos un trocito de Galicia a Madrid para degustar la mejor Estrella Galicia.
+            Reserva tu mesa de forma rápida y sencilla. Te esperamos para disfrutar de la mejor comida gallega en Madrid.
           </p>
         </div>
 
@@ -862,62 +845,23 @@ function ReservationSection() {
           ))}
         </div>
 
-        {submitted ? (
-          <div className="bg-[#1a1a1a]/90 backdrop-blur rounded-xl sm:rounded-2xl p-8 sm:p-12 text-center border border-[#c9a227]/30">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-[#c9a227] rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
-              <svg className="w-8 h-8 sm:w-10 sm:h-10 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-            </div>
-            <h3 className="text-xl sm:text-2xl font-bold text-[#c9a227] mb-3 sm:mb-4">¡Reserva Enviada!</h3>
-            <p className="text-[#b0b0b0] text-sm sm:text-base">Se ha abierto WhatsApp. ¡Envía el mensaje!</p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="bg-[#1a1a1a]/90 backdrop-blur rounded-xl sm:rounded-2xl p-5 sm:p-8 border border-[#2a2a2a]">
-            <div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
-              <div>
-                <label className="flex items-center gap-2 text-xs sm:text-sm text-[#b0b0b0] uppercase tracking-wider mb-1.5 sm:mb-2"><span className="text-[#c9a227]">👤</span> Nombre *</label>
-                <input type="text" required value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full bg-[#0a0a0a] border border-[#3a3a3a] rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-white text-sm sm:text-base placeholder-[#505050] focus:outline-none focus:border-[#c9a227]" placeholder="Tu nombre" />
-              </div>
-              <div>
-                <label className="flex items-center gap-2 text-xs sm:text-sm text-[#b0b0b0] uppercase tracking-wider mb-1.5 sm:mb-2"><span className="text-[#c9a227]">📧</span> Email *</label>
-                <input type="email" required value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full bg-[#0a0a0a] border border-[#3a3a3a] rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-white text-sm sm:text-base placeholder-[#505050] focus:outline-none focus:border-[#c9a227]" placeholder="tu@email.com" />
-              </div>
-              <div>
-                <label className="flex items-center gap-2 text-xs sm:text-sm text-[#b0b0b0] uppercase tracking-wider mb-1.5 sm:mb-2"><span className="text-[#c9a227]">📱</span> Teléfono *</label>
-                <input type="tel" required value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} className="w-full bg-[#0a0a0a] border border-[#3a3a3a] rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-white text-sm sm:text-base placeholder-[#505050] focus:outline-none focus:border-[#c9a227]" placeholder="+34 600 000 000" />
-              </div>
-              <div>
-                <label className="flex items-center gap-2 text-xs sm:text-sm text-[#b0b0b0] uppercase tracking-wider mb-1.5 sm:mb-2"><span className="text-[#c9a227]">👥</span> Comensales *</label>
-                <select required value={formData.guests} onChange={(e) => setFormData({...formData, guests: e.target.value})} className="w-full bg-[#0a0a0a] border border-[#3a3a3a] rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-white text-sm sm:text-base focus:outline-none focus:border-[#c9a227]">
-                  {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n} persona{n>1?'s':''}</option>)}
-                  <option value="10+">Más de 10</option>
-                </select>
-              </div>
-              <div>
-                <label className="flex items-center gap-2 text-xs sm:text-sm text-[#b0b0b0] uppercase tracking-wider mb-1.5 sm:mb-2"><span className="text-[#c9a227]">📅</span> Fecha *</label>
-                <input type="date" required min={today} value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className="w-full bg-[#0a0a0a] border border-[#3a3a3a] rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-white text-sm sm:text-base focus:outline-none focus:border-[#c9a227]" />
-              </div>
-              <div>
-                <label className="flex items-center gap-2 text-xs sm:text-sm text-[#b0b0b0] uppercase tracking-wider mb-1.5 sm:mb-2"><span className="text-[#c9a227]">🕐</span> Hora *</label>
-                <select required value={formData.time} onChange={(e) => setFormData({...formData, time: e.target.value})} className="w-full bg-[#0a0a0a] border border-[#3a3a3a] rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-white text-sm sm:text-base focus:outline-none focus:border-[#c9a227]">
-                  <option value="">Seleccionar hora</option>
-                  {['13:00','13:30','14:00','14:30','15:00','15:30','20:00','20:30','21:00','21:30','22:00','22:30','23:00'].map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="mt-4 sm:mt-6">
-              <label className="flex items-center gap-2 text-xs sm:text-sm text-[#b0b0b0] uppercase tracking-wider mb-1.5 sm:mb-2"><span className="text-[#c9a227]">💬</span> Comentarios</label>
-              <textarea value={formData.message} onChange={(e) => setFormData({...formData, message: e.target.value})} rows={2} className="w-full bg-[#0a0a0a] border border-[#3a3a3a] rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-white text-sm sm:text-base placeholder-[#505050] focus:outline-none focus:border-[#c9a227] resize-none" placeholder="Alergias, celebraciones..." />
-            </div>
-            <button type="submit" disabled={isSubmitting} className="w-full mt-6 sm:mt-8 py-3 sm:py-4 bg-[#c9a227] text-black font-semibold text-sm sm:text-base uppercase tracking-wider rounded-lg hover:bg-[#e3c453] transition-all flex items-center justify-center gap-2 disabled:opacity-70">
-              {isSubmitting ? (
-                <>
-                  <svg className="animate-spin h-4 sm:h-5 w-4 sm:w-5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                  Enviando...
-                </>
-              ) : '📱 Reservar por WhatsApp'}
-            </button>
-          </form>
-        )}
+        {/* Tableo Reservation Widget */}
+        <div className="bg-[#1a1a1a]/90 backdrop-blur rounded-xl sm:rounded-2xl overflow-hidden border border-[#2a2a2a] shadow-2xl">
+          <iframe 
+            src="https://app.tableo.com/r/KQ8kqcR" 
+            width="100%" 
+            height="700" 
+            style={{ border: 'none', minHeight: '700px' }} 
+            referrerPolicy="unsafe-url"
+            title="Sistema de Reservas A Rúa"
+          />
+        </div>
+
+        <div className="text-center mt-6 sm:mt-8">
+          <p className="text-[#909090] text-xs sm:text-sm">
+            ¿Tienes dudas? Llámanos al <a href="tel:+34911661641" className="text-[#c9a227] hover:underline">911 66 16 41</a> o escríbenos por <a href="https://wa.me/34911661641" target="_blank" rel="noopener noreferrer" className="text-[#c9a227] hover:underline">WhatsApp</a>
+          </p>
+        </div>
       </div>
     </section>
   )
