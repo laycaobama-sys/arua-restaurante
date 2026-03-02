@@ -1060,54 +1060,107 @@ function GallerySection() {
 }
 
 // ============================================================================
-// RESERVATION SECTION - SISTEMA PROPIO GRATUITO
+// RESERVATION SECTION - SISTEMA CON SUPABASE
 // ============================================================================
 function ReservationSection() {
   const [formData, setFormData] = useState({ name: '', phone: '', email: '', date: '', time: '', guests: '2', occasion: '', requests: '' })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [reservationId, setReservationId] = useState('')
+  const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'error'>('checking')
+  const [reservationsToday, setReservationsToday] = useState(0)
 
-  const generateId = () => {
-    return 'AR' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 5).toUpperCase()
-  }
+  // Verificar conexión a Supabase al cargar
+  useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        const response = await fetch('/api/init-db')
+        const data = await response.json()
+        
+        if (data.success && data.tableExists) {
+          setDbStatus('connected')
+          
+          // Cargar reservas de hoy
+          const today = new Date().toISOString().split('T')[0]
+          const resResponse = await fetch(`/api/reservations?date=${today}`)
+          const resData = await resResponse.json()
+          if (resData.success) {
+            setReservationsToday(resData.reservations?.length || 0)
+          }
+        } else {
+          setDbStatus('error')
+        }
+      } catch (err) {
+        console.error('DB connection error:', err)
+        setDbStatus('error')
+      }
+    }
+    checkConnection()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
     
-    const id = generateId()
-    setReservationId(id)
-    
-    // Crear objeto de reserva
-    const reservation = {
-      id,
-      ...formData,
-      createdAt: new Date().toISOString(),
-      status: 'confirmed'
+    try {
+      // Enviar reserva a Supabase
+      const response = await fetch('/api/reservations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      })
+      
+      const data = await response.json()
+      
+      if (data.success && data.reservation) {
+        const reservation = data.reservation
+        setReservationId(reservation.id)
+        
+        // Enviar confirmación por WhatsApp
+        const message = `🍽️ *NUEVA RESERVA - A RÚA*\n\n` +
+          `📋 *Código:* ${reservation.id}\n` +
+          `👤 *Nombre:* ${formData.name}\n` +
+          `📱 *Teléfono:* ${formData.phone}\n` +
+          `📅 *Fecha:* ${formData.date}\n` +
+          `🕐 *Hora:* ${formData.time}\n` +
+          `👥 *Personas:* ${formData.guests}\n` +
+          (formData.occasion ? `🎉 *Ocasión:* ${formData.occasion}\n` : '') +
+          (formData.requests ? `💬 *Peticiones:* ${formData.requests}\n` : '') +
+          `\n✅ *Reserva confirmada*\n` +
+          `📊 *Guardada en base de datos*`
+        
+        window.open(`https://wa.me/34911661641?text=${encodeURIComponent(message)}`, '_blank')
+        
+        setSubmitted(true)
+        setReservationsToday(prev => prev + 1)
+      } else {
+        // Si hay un error, mostrar mensaje pero dar el código de todos modos
+        const fallbackId = 'AR' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 5).toUpperCase()
+        setReservationId(fallbackId)
+        
+        const message = `🍽️ *NUEVA RESERVA - A RÚA*\n\n` +
+          `📋 *Código:* ${fallbackId}\n` +
+          `👤 *Nombre:* ${formData.name}\n` +
+          `📱 *Teléfono:* ${formData.phone}\n` +
+          `📅 *Fecha:* ${formData.date}\n` +
+          `🕐 *Hora:* ${formData.time}\n` +
+          `👥 *Personas:* ${formData.guests}\n` +
+          (formData.occasion ? `🎉 *Ocasión:* ${formData.occasion}\n` : '') +
+          (formData.requests ? `💬 *Peticiones:* ${formData.requests}\n` : '') +
+          `\n⚠️ *Reserva pendiente de confirmación*`
+        
+        window.open(`https://wa.me/34911661641?text=${encodeURIComponent(message)}`, '_blank')
+        setSubmitted(true)
+      }
+    } catch (error) {
+      console.error('Reservation error:', error)
+      // Fallback - generar código local
+      const fallbackId = 'AR' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 5).toUpperCase()
+      setReservationId(fallbackId)
+      setSubmitted(true)
     }
     
-    // Guardar en localStorage
-    const reservations = JSON.parse(localStorage.getItem('arua_reservations') || '[]')
-    reservations.push(reservation)
-    localStorage.setItem('arua_reservations', JSON.stringify(reservations))
-    
-    // Enviar confirmación por WhatsApp
-    const message = `🍽️ *NUEVA RESERVA - A RÚA*\n\n` +
-      `📋 *Código:* ${id}\n` +
-      `👤 *Nombre:* ${formData.name}\n` +
-      `📱 *Teléfono:* ${formData.phone}\n` +
-      `📅 *Fecha:* ${formData.date}\n` +
-      `🕐 *Hora:* ${formData.time}\n` +
-      `👥 *Personas:* ${formData.guests}\n` +
-      (formData.occasion ? `🎉 *Ocasión:* ${formData.occasion}\n` : '') +
-      (formData.requests ? `💬 *Peticiones:* ${formData.requests}\n` : '') +
-      `\n✅ *Reserva confirmada automáticamente*`
-    
-    window.open(`https://wa.me/34911661641?text=${encodeURIComponent(message)}`, '_blank')
-    
     setIsSubmitting(false)
-    setSubmitted(true)
   }
 
   const today = new Date().toISOString().split('T')[0]
@@ -1126,9 +1179,34 @@ function ReservationSection() {
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold mt-3 sm:mt-4 mb-4 sm:mb-6">
             <span className="bg-gradient-to-r from-[#c9a227] via-[#e3c453] to-[#c9a227] bg-clip-text text-transparent">Reserva tu Mesa</span>
           </h2>
-          <p className="text-[#b0b0b0] max-w-2xl mx-auto text-sm sm:text-base px-4">
+          <p className="text-[#b0b0b0] max-w-2xl mx-auto text-sm sm:text-base px-4 mb-4">
             Reserva online 24/7. Confirmación inmediata. Sin esperas.
           </p>
+          {/* Estado de la base de datos */}
+          <div className="flex items-center justify-center gap-2 text-xs sm:text-sm">
+            {dbStatus === 'checking' && (
+              <span className="text-[#909090] flex items-center gap-2">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Conectando a base de datos...
+              </span>
+            )}
+            {dbStatus === 'connected' && (
+              <span className="text-green-400 flex items-center gap-2">
+                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                Base de datos conectada
+                {reservationsToday > 0 && <span className="text-[#c9a227]">• {reservationsToday} reservas hoy</span>}
+              </span>
+            )}
+            {dbStatus === 'error' && (
+              <span className="text-yellow-400 flex items-center gap-2">
+                <span className="w-2 h-2 bg-yellow-400 rounded-full"></span>
+                Modo offline - WhatsApp backup
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-8 sm:mb-10">
