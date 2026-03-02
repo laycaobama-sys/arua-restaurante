@@ -321,6 +321,256 @@ function Chatbot() {
 }
 
 // ============================================================================
+// VOICE AGENT - Agente de Voz IA
+// ============================================================================
+function VoiceAgent() {
+  const [isOpen, setIsOpen] = useState(false)
+  const [isListening, setIsListening] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; text: string }[]>([])
+  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null)
+  
+  const recognitionRef = useRef<any>(null)
+
+  // Inicializar Speech Recognition
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+      if (SpeechRecognition) {
+        recognitionRef.current = new SpeechRecognition()
+        recognitionRef.current.continuous = false
+        recognitionRef.current.interimResults = false
+        recognitionRef.current.lang = 'es-ES'
+
+        recognitionRef.current.onresult = async (event: any) => {
+          const transcript = event.results[0][0].transcript
+          setIsListening(false)
+          await sendMessage(transcript)
+        }
+
+        recognitionRef.current.onerror = () => {
+          setIsListening(false)
+        }
+
+        recognitionRef.current.onend = () => {
+          setIsListening(false)
+        }
+      }
+    }
+  }, [])
+
+  // Limpiar conversación al cerrar
+  useEffect(() => {
+    if (!isOpen) {
+      setTimeout(() => {
+        setMessages([])
+        if (currentAudio) {
+          currentAudio.pause()
+          setCurrentAudio(null)
+        }
+      }, 300)
+    }
+  }, [isOpen])
+
+  const startListening = () => {
+    if (recognitionRef.current && !isListening && !isProcessing) {
+      setIsListening(true)
+      recognitionRef.current.start()
+    }
+  }
+
+  const sendMessage = async (text: string) => {
+    if (!text.trim() || isProcessing) return
+
+    const userMessage = { role: 'user' as const, text }
+    setMessages(prev => [...prev, userMessage])
+    setIsProcessing(true)
+
+    try {
+      const response = await fetch('/api/voice-agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          conversationHistory: messages.map(m => ({ role: m.role, content: m.text }))
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        const assistantMessage = { role: 'assistant' as const, text: data.text }
+        setMessages(prev => [...prev, assistantMessage])
+
+        // Reproducir audio si está disponible
+        if (data.audio) {
+          playAudio(data.audio)
+        }
+      }
+    } catch (error) {
+      console.error('Error:', error)
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const playAudio = (audioDataUrl: string) => {
+    if (currentAudio) {
+      currentAudio.pause()
+    }
+
+    const audio = new Audio(audioDataUrl)
+    setCurrentAudio(audio)
+    setIsSpeaking(true)
+
+    audio.onended = () => {
+      setIsSpeaking(false)
+      setCurrentAudio(null)
+    }
+
+    audio.play().catch(err => {
+      console.error('Error playing audio:', err)
+      setIsSpeaking(false)
+    })
+  }
+
+  const stopSpeaking = () => {
+    if (currentAudio) {
+      currentAudio.pause()
+      setCurrentAudio(null)
+      setIsSpeaking(false)
+    }
+  }
+
+  return (
+    <>
+      {/* Botón flotante del agente de voz */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="fixed bottom-4 left-4 z-[100] w-14 h-14 sm:w-16 sm:h-16 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300"
+        style={{ 
+          background: isOpen ? '#1a1a1a' : 'linear-gradient(135deg, #c9a227 0%, #e3c453 100%)', 
+          boxShadow: isOpen ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 25px rgba(201, 162, 39, 0.5)',
+          left: '16px'
+        }}
+        aria-label="Agente de Voz"
+      >
+        {isOpen ? (
+          <svg className="w-6 h-6 sm:w-7 sm:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        ) : (
+          <svg className="w-6 h-6 sm:w-7 sm:h-7 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+          </svg>
+        )}
+      </button>
+
+      {/* Panel del agente de voz */}
+      <div 
+        className={`fixed z-[95] transition-all duration-300 ${isOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-4 pointer-events-none'}`}
+        style={{ bottom: '80px', left: '16px', width: 'calc(100vw - 32px)', maxWidth: '400px' }}
+      >
+        <div className="rounded-2xl overflow-hidden shadow-2xl" style={{ background: 'linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%)', border: '1px solid rgba(201, 162, 39, 0.3)' }}>
+          {/* Header */}
+          <div className="p-4 flex items-center gap-3" style={{ background: 'linear-gradient(135deg, #c9a227 0%, #a88a1f 100%)' }}>
+            <div className="w-12 h-12 rounded-full flex items-center justify-center relative" style={{ background: 'rgba(0,0,0,0.2)' }}>
+              <span className="text-2xl">👩‍💼</span>
+              {(isListening || isSpeaking) && (
+                <div className="absolute inset-0 rounded-full border-2 border-white animate-ping" />
+              )}
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-black text-lg">María - A Rúa</h3>
+              <div className="flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${isListening ? 'bg-red-500 animate-pulse' : isSpeaking ? 'bg-green-500 animate-pulse' : 'bg-green-600'}`}></span>
+                <span className="text-xs text-black/70">
+                  {isListening ? 'Escuchando...' : isSpeaking ? 'Hablando...' : isProcessing ? 'Pensando...' : 'En línea'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Mensajes */}
+          <div className="h-48 overflow-y-auto p-4 space-y-3" style={{ background: 'linear-gradient(180deg, #141414 0%, #0a0a0a 100%)' }}>
+            {messages.length === 0 && (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#c9a227]/20 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-[#c9a227]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                  </svg>
+                </div>
+                <p className="text-[#909090] text-sm">Toca el micrófono para hablar con María</p>
+                <p className="text-[#606060] text-xs mt-2">Pregúnta por reservas, horarios, ubicación...</p>
+              </div>
+            )}
+            {messages.map((msg, index) => (
+              <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div 
+                  className={`max-w-[85%] rounded-2xl px-4 py-3 ${msg.role === 'user' ? 'rounded-br-sm' : 'rounded-bl-sm'}`}
+                  style={{ background: msg.role === 'user' ? 'linear-gradient(135deg, #c9a227 0%, #b8941f 100%)' : 'linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%)', border: msg.role === 'assistant' ? '1px solid #3a3a3a' : 'none' }}
+                >
+                  <p className="text-sm whitespace-pre-line leading-relaxed" style={{ color: msg.role === 'user' ? '#000' : '#fff' }}>{msg.text}</p>
+                </div>
+              </div>
+            ))}
+            {(isProcessing || isListening) && (
+              <div className="flex justify-start">
+                <div className="rounded-2xl px-4 py-3 rounded-bl-sm" style={{ background: 'linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%)', border: '1px solid #3a3a3a' }}>
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 bg-[#c9a227] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                    <span className="w-2 h-2 bg-[#c9a227] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                    <span className="w-2 h-2 bg-[#c9a227] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Controles */}
+          <div className="p-4 border-t border-[#2a2a2a]" style={{ background: '#0d0d0d' }}>
+            <div className="flex justify-center gap-4">
+              {/* Botón micrófono */}
+              <button
+                onClick={startListening}
+                disabled={isListening || isProcessing || isSpeaking}
+                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all ${
+                  isListening 
+                    ? 'bg-red-500 animate-pulse' 
+                    : isProcessing || isSpeaking 
+                      ? 'bg-[#2a2a2a] cursor-not-allowed' 
+                      : 'bg-[#c9a227] hover:bg-[#e3c453]'
+                }`}
+              >
+                <svg className="w-7 h-7 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+              </button>
+
+              {/* Botón detener */}
+              {isSpeaking && (
+                <button
+                  onClick={stopSpeaking}
+                  className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center transition-all hover:bg-red-600"
+                >
+                  <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <rect x="6" y="6" width="12" height="12" rx="1" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            <p className="text-center text-[#606060] text-xs mt-3">
+              {isListening ? 'Habla ahora...' : isSpeaking ? 'Toca para detener' : 'Toca para hablar'}
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ============================================================================
 // NAVIGATION
 // ============================================================================
 function Navigation() {
@@ -810,9 +1060,59 @@ function GallerySection() {
 }
 
 // ============================================================================
-// RESERVATION SECTION - GLORIAFOOD
+// RESERVATION SECTION - SISTEMA PROPIO GRATUITO
 // ============================================================================
 function ReservationSection() {
+  const [formData, setFormData] = useState({ name: '', phone: '', email: '', date: '', time: '', guests: '2', occasion: '', requests: '' })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [reservationId, setReservationId] = useState('')
+
+  const generateId = () => {
+    return 'AR' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 5).toUpperCase()
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+    
+    const id = generateId()
+    setReservationId(id)
+    
+    // Crear objeto de reserva
+    const reservation = {
+      id,
+      ...formData,
+      createdAt: new Date().toISOString(),
+      status: 'confirmed'
+    }
+    
+    // Guardar en localStorage
+    const reservations = JSON.parse(localStorage.getItem('arua_reservations') || '[]')
+    reservations.push(reservation)
+    localStorage.setItem('arua_reservations', JSON.stringify(reservations))
+    
+    // Enviar confirmación por WhatsApp
+    const message = `🍽️ *NUEVA RESERVA - A RÚA*\n\n` +
+      `📋 *Código:* ${id}\n` +
+      `👤 *Nombre:* ${formData.name}\n` +
+      `📱 *Teléfono:* ${formData.phone}\n` +
+      `📅 *Fecha:* ${formData.date}\n` +
+      `🕐 *Hora:* ${formData.time}\n` +
+      `👥 *Personas:* ${formData.guests}\n` +
+      (formData.occasion ? `🎉 *Ocasión:* ${formData.occasion}\n` : '') +
+      (formData.requests ? `💬 *Peticiones:* ${formData.requests}\n` : '') +
+      `\n✅ *Reserva confirmada automáticamente*`
+    
+    window.open(`https://wa.me/34911661641?text=${encodeURIComponent(message)}`, '_blank')
+    
+    setIsSubmitting(false)
+    setSubmitted(true)
+  }
+
+  const today = new Date().toISOString().split('T')[0]
+  const times = ['13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '20:00', '20:30', '21:00', '21:30', '22:00', '22:30', '23:00']
+
   return (
     <section id="reservas" className="py-16 sm:py-24 lg:py-32 relative overflow-hidden">
       <div className="absolute inset-0">
@@ -822,12 +1122,12 @@ function ReservationSection() {
 
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6">
         <div className="text-center mb-8 sm:mb-12">
-          <span className="text-[#c9a227] tracking-[0.2em] uppercase text-xs sm:text-sm">Reserva tu Mesa</span>
+          <span className="text-[#c9a227] tracking-[0.2em] uppercase text-xs sm:text-sm">Sistema de Reservas Automatizado</span>
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold mt-3 sm:mt-4 mb-4 sm:mb-6">
-            <span className="bg-gradient-to-r from-[#c9a227] via-[#e3c453] to-[#c9a227] bg-clip-text text-transparent">Hacer Reserva</span>
+            <span className="bg-gradient-to-r from-[#c9a227] via-[#e3c453] to-[#c9a227] bg-clip-text text-transparent">Reserva tu Mesa</span>
           </h2>
           <p className="text-[#b0b0b0] max-w-2xl mx-auto text-sm sm:text-base px-4">
-            Reserva tu mesa de forma rápida y sencilla. Confirmación inmediata. ¡Te esperamos!
+            Reserva online 24/7. Confirmación inmediata. Sin esperas.
           </p>
         </div>
 
@@ -845,35 +1145,179 @@ function ReservationSection() {
           ))}
         </div>
 
-        {/* GloriaFood Widget */}
-        <div className="bg-[#1a1a1a]/90 backdrop-blur rounded-xl sm:rounded-2xl overflow-hidden border border-[#2a2a2a] shadow-2xl">
-          <iframe 
-            src="https://www.gloriafood.com/restaurants/arua-restaurante.netlify.app-reservas/reservation" 
-            width="100%" 
-            height="650" 
-            style={{ border: 'none', minHeight: '650px' }}
-            title="Reservar mesa en A Rúa"
-            loading="lazy"
-          />
-        </div>
+        {submitted ? (
+          <div className="bg-[#1a1a1a]/90 backdrop-blur rounded-xl sm:rounded-2xl p-8 sm:p-12 text-center border border-[#c9a227]/30">
+            <div className="w-20 h-20 bg-[#c9a227] rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg className="w-10 h-10 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-bold text-[#c9a227] mb-4">¡Reserva Confirmada!</h3>
+            <p className="text-white text-lg mb-2">Tu código de reserva:</p>
+            <div className="bg-[#c9a227] text-black text-2xl font-bold py-3 px-6 rounded-lg inline-block mb-4">
+              {reservationId}
+            </div>
+            <p className="text-[#b0b0b0] text-sm sm:text-base mb-4">
+              Te hemos enviado la confirmación por WhatsApp.<br/>
+              Presenta este código al llegar al restaurante.
+            </p>
+            <button 
+              onClick={() => { setSubmitted(false); setFormData({ name: '', phone: '', email: '', date: '', time: '', guests: '2', occasion: '', requests: '' }) }}
+              className="text-[#c9a227] underline hover:text-[#e3c453]"
+            >
+              Hacer otra reserva
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="bg-[#1a1a1a]/90 backdrop-blur rounded-xl sm:rounded-2xl p-5 sm:p-8 border border-[#2a2a2a]">
+            <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
+              <div>
+                <label className="flex items-center gap-2 text-xs sm:text-sm text-[#b0b0b0] uppercase tracking-wider mb-2">
+                  <span className="text-[#c9a227]">👤</span> Nombre completo *
+                </label>
+                <input 
+                  type="text" 
+                  required 
+                  value={formData.name} 
+                  onChange={(e) => setFormData({...formData, name: e.target.value})} 
+                  className="w-full bg-[#0a0a0a] border border-[#3a3a3a] rounded-lg px-4 py-3 text-white placeholder-[#505050] focus:outline-none focus:border-[#c9a227]" 
+                  placeholder="Tu nombre" 
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-2 text-xs sm:text-sm text-[#b0b0b0] uppercase tracking-wider mb-2">
+                  <span className="text-[#c9a227]">📱</span> Teléfono *
+                </label>
+                <input 
+                  type="tel" 
+                  required 
+                  value={formData.phone} 
+                  onChange={(e) => setFormData({...formData, phone: e.target.value})} 
+                  className="w-full bg-[#0a0a0a] border border-[#3a3a3a] rounded-lg px-4 py-3 text-white placeholder-[#505050] focus:outline-none focus:border-[#c9a227]" 
+                  placeholder="+34 600 000 000" 
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-2 text-xs sm:text-sm text-[#b0b0b0] uppercase tracking-wider mb-2">
+                  <span className="text-[#c9a227]">📧</span> Email
+                </label>
+                <input 
+                  type="email" 
+                  value={formData.email} 
+                  onChange={(e) => setFormData({...formData, email: e.target.value})} 
+                  className="w-full bg-[#0a0a0a] border border-[#3a3a3a] rounded-lg px-4 py-3 text-white placeholder-[#505050] focus:outline-none focus:border-[#c9a227]" 
+                  placeholder="tu@email.com (opcional)" 
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-2 text-xs sm:text-sm text-[#b0b0b0] uppercase tracking-wider mb-2">
+                  <span className="text-[#c9a227]">👥</span> Nº de personas *
+                </label>
+                <select 
+                  required 
+                  value={formData.guests} 
+                  onChange={(e) => setFormData({...formData, guests: e.target.value})} 
+                  className="w-full bg-[#0a0a0a] border border-[#3a3a3a] rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#c9a227]"
+                >
+                  {[1,2,3,4,5,6,7,8,9,10].map(n => (
+                    <option key={n} value={n}>{n} {n === 1 ? 'persona' : 'personas'}</option>
+                  ))}
+                  <option value="10+">Más de 10</option>
+                </select>
+              </div>
+              <div>
+                <label className="flex items-center gap-2 text-xs sm:text-sm text-[#b0b0b0] uppercase tracking-wider mb-2">
+                  <span className="text-[#c9a227]">📅</span> Fecha *
+                </label>
+                <input 
+                  type="date" 
+                  required 
+                  min={today} 
+                  value={formData.date} 
+                  onChange={(e) => setFormData({...formData, date: e.target.value})} 
+                  className="w-full bg-[#0a0a0a] border border-[#3a3a3a] rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#c9a227]" 
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-2 text-xs sm:text-sm text-[#b0b0b0] uppercase tracking-wider mb-2">
+                  <span className="text-[#c9a227]">🕐</span> Hora *
+                </label>
+                <select 
+                  required 
+                  value={formData.time} 
+                  onChange={(e) => setFormData({...formData, time: e.target.value})} 
+                  className="w-full bg-[#0a0a0a] border border-[#3a3a3a] rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#c9a227]"
+                >
+                  <option value="">Seleccionar hora</option>
+                  {times.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            
+            <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
+              <div>
+                <label className="flex items-center gap-2 text-xs sm:text-sm text-[#b0b0b0] uppercase tracking-wider mb-2">
+                  <span className="text-[#c9a227]">🎉</span> Ocasión especial
+                </label>
+                <select 
+                  value={formData.occasion} 
+                  onChange={(e) => setFormData({...formData, occasion: e.target.value})} 
+                  className="w-full bg-[#0a0a0a] border border-[#3a3a3a] rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#c9a227]"
+                >
+                  <option value="">Ninguna</option>
+                  <option value="Cumpleaños">🎂 Cumpleaños</option>
+                  <option value="Aniversario">💕 Aniversario</option>
+                  <option value="Reunión de negocios">💼 Reunión de negocios</option>
+                  <option value="Celebración familiar">👨‍👩‍👧‍👦 Celebración familiar</option>
+                  <option value="Pedida de mano">💍 Pedida de mano</option>
+                  <option value="Otra">✨ Otra celebración</option>
+                </select>
+              </div>
+              <div>
+                <label className="flex items-center gap-2 text-xs sm:text-sm text-[#b0b0b0] uppercase tracking-wider mb-2">
+                  <span className="text-[#c9a227]">💬</span> Comentarios
+                </label>
+                <input 
+                  type="text" 
+                  value={formData.requests} 
+                  onChange={(e) => setFormData({...formData, requests: e.target.value})} 
+                  className="w-full bg-[#0a0a0a] border border-[#3a3a3a] rounded-lg px-4 py-3 text-white placeholder-[#505050] focus:outline-none focus:border-[#c9a227]" 
+                  placeholder="Alergias, silla de bebé, etc." 
+                />
+              </div>
+            </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mt-8">
-          <a 
-            href="https://wa.me/34911661641?text=Hola!%20Quiero%20hacer%20una%20reserva" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="w-full sm:w-auto px-8 py-4 bg-[#25D366] text-white font-semibold text-base uppercase tracking-wider rounded-lg hover:bg-[#20BA5A] transition-all flex items-center justify-center gap-3 shadow-lg"
-          >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-            </svg>
-            ¿Prefieres reservar por WhatsApp?
-          </a>
-        </div>
+            <button 
+              type="submit" 
+              disabled={isSubmitting} 
+              className="w-full py-4 bg-[#c9a227] text-black font-semibold text-base uppercase tracking-wider rounded-lg hover:bg-[#e3c453] transition-all flex items-center justify-center gap-3 disabled:opacity-70"
+            >
+              {isSubmitting ? (
+                <>
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Procesando reserva...
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Confirmar Reserva
+                </>
+              )}
+            </button>
+          </form>
+        )}
 
-        <div className="text-center mt-6 sm:mt-8">
+        <div className="text-center mt-8">
           <p className="text-[#909090] text-xs sm:text-sm">
-            ¿Tienes dudas? Llámanos al <a href="tel:+34911661641" className="text-[#c9a227] hover:underline">911 66 16 41</a>
+            ¿Prefieres llamar? 📞 <a href="tel:+34911661641" className="text-[#c9a227] hover:underline">911 66 16 41</a>
+            {' '} | WhatsApp 💬 <a href="https://wa.me/34911661641" target="_blank" rel="noopener noreferrer" className="text-[#c9a227] hover:underline">911 66 16 41</a>
           </p>
         </div>
       </div>
@@ -964,6 +1408,7 @@ export default function Home() {
       <ContactSection />
       <Footer />
       <Chatbot />
+      <VoiceAgent />
     </main>
   )
 }
