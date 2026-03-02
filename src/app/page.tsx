@@ -1069,6 +1069,8 @@ function ReservationSection() {
   const [reservationId, setReservationId] = useState('')
   const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'error'>('checking')
   const [reservationsToday, setReservationsToday] = useState(0)
+  const [emailSent, setEmailSent] = useState(false)
+  const [emailError, setEmailError] = useState('')
 
   // Verificar conexión a Supabase al cargar
   useEffect(() => {
@@ -1101,9 +1103,10 @@ function ReservationSection() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
+    setEmailError('')
     
     try {
-      // Enviar reserva a Supabase
+      // Enviar reserva a Supabase y enviar email
       const response = await fetch('/api/reservations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1115,46 +1118,24 @@ function ReservationSection() {
       if (data.success && data.reservation) {
         const reservation = data.reservation
         setReservationId(reservation.id)
+        setEmailSent(data.emailSent || false)
         
-        // Enviar confirmación por WhatsApp
-        const message = `🍽️ *NUEVA RESERVA - A RÚA*\n\n` +
-          `📋 *Código:* ${reservation.id}\n` +
-          `👤 *Nombre:* ${formData.name}\n` +
-          `📱 *Teléfono:* ${formData.phone}\n` +
-          `📅 *Fecha:* ${formData.date}\n` +
-          `🕐 *Hora:* ${formData.time}\n` +
-          `👥 *Personas:* ${formData.guests}\n` +
-          (formData.occasion ? `🎉 *Ocasión:* ${formData.occasion}\n` : '') +
-          (formData.requests ? `💬 *Peticiones:* ${formData.requests}\n` : '') +
-          `\n✅ *Reserva confirmada*\n` +
-          `📊 *Guardada en base de datos*`
-        
-        window.open(`https://wa.me/34911661641?text=${encodeURIComponent(message)}`, '_blank')
+        if (!data.emailSent && data.emailError) {
+          setEmailError(data.emailError)
+        }
         
         setSubmitted(true)
         setReservationsToday(prev => prev + 1)
       } else {
-        // Si hay un error, mostrar mensaje pero dar el código de todos modos
+        // Si hay un error, mostrar mensaje
+        setEmailError(data.error || 'Error al procesar la reserva')
         const fallbackId = 'AR' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 5).toUpperCase()
         setReservationId(fallbackId)
-        
-        const message = `🍽️ *NUEVA RESERVA - A RÚA*\n\n` +
-          `📋 *Código:* ${fallbackId}\n` +
-          `👤 *Nombre:* ${formData.name}\n` +
-          `📱 *Teléfono:* ${formData.phone}\n` +
-          `📅 *Fecha:* ${formData.date}\n` +
-          `🕐 *Hora:* ${formData.time}\n` +
-          `👥 *Personas:* ${formData.guests}\n` +
-          (formData.occasion ? `🎉 *Ocasión:* ${formData.occasion}\n` : '') +
-          (formData.requests ? `💬 *Peticiones:* ${formData.requests}\n` : '') +
-          `\n⚠️ *Reserva pendiente de confirmación*`
-        
-        window.open(`https://wa.me/34911661641?text=${encodeURIComponent(message)}`, '_blank')
         setSubmitted(true)
       }
     } catch (error) {
       console.error('Reservation error:', error)
-      // Fallback - generar código local
+      setEmailError('Error de conexión')
       const fallbackId = 'AR' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 5).toUpperCase()
       setReservationId(fallbackId)
       setSubmitted(true)
@@ -1235,12 +1216,24 @@ function ReservationSection() {
             <div className="bg-[#c9a227] text-black text-2xl font-bold py-3 px-6 rounded-lg inline-block mb-4">
               {reservationId}
             </div>
-            <p className="text-[#b0b0b0] text-sm sm:text-base mb-4">
-              Te hemos enviado la confirmación por WhatsApp.<br/>
-              Presenta este código al llegar al restaurante.
-            </p>
+            {emailSent ? (
+              <p className="text-green-400 text-sm sm:text-base mb-4">
+                ✅ Te hemos enviado un email de confirmación a <strong>{formData.email}</strong><br/>
+                Presenta el código al llegar al restaurante.
+              </p>
+            ) : emailError ? (
+              <p className="text-yellow-400 text-sm sm:text-base mb-4">
+                ⚠️ Reserva guardada, pero no se pudo enviar el email.<br/>
+                Presenta este código al llegar al restaurante.
+              </p>
+            ) : (
+              <p className="text-[#b0b0b0] text-sm sm:text-base mb-4">
+                Presenta este código al llegar al restaurante.<br/>
+                Te llamaremos para confirmar.
+              </p>
+            )}
             <button 
-              onClick={() => { setSubmitted(false); setFormData({ name: '', phone: '', email: '', date: '', time: '', guests: '2', occasion: '', requests: '' }) }}
+              onClick={() => { setSubmitted(false); setEmailSent(false); setEmailError(''); setFormData({ name: '', phone: '', email: '', date: '', time: '', guests: '2', occasion: '', requests: '' }) }}
               className="text-[#c9a227] underline hover:text-[#e3c453]"
             >
               Hacer otra reserva
@@ -1277,14 +1270,15 @@ function ReservationSection() {
               </div>
               <div>
                 <label className="flex items-center gap-2 text-xs sm:text-sm text-[#b0b0b0] uppercase tracking-wider mb-2">
-                  <span className="text-[#c9a227]">📧</span> Email
+                  <span className="text-[#c9a227]">📧</span> Email *
                 </label>
                 <input 
                   type="email" 
+                  required
                   value={formData.email} 
                   onChange={(e) => setFormData({...formData, email: e.target.value})} 
                   className="w-full bg-[#0a0a0a] border border-[#3a3a3a] rounded-lg px-4 py-3 text-white placeholder-[#505050] focus:outline-none focus:border-[#c9a227]" 
-                  placeholder="tu@email.com (opcional)" 
+                  placeholder="tu@email.com" 
                 />
               </div>
               <div>

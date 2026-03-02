@@ -8,9 +8,8 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-// Configuración de Resend (API Key necesaria)
-// Obtener una gratis en: https://resend.com/api-keys
-const RESEND_API_KEY = process.env.RESEND_API_KEY || 're_123456789'
+// Configuración de Resend
+const RESEND_API_KEY = process.env.RESEND_API_KEY || 're_8vVUxGaV_PwSSg5akVBxMJG3cGvppjjyC'
 
 // Email del restaurante (donde llegarán las notificaciones)
 const RESTAURANT_EMAIL = 'arua.restaurante@gmail.com'
