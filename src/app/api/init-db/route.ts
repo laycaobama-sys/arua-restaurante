@@ -2,32 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 
 // Configuración de Supabase
 const supabaseUrl = 'https://kofjefrzijzwejuaryjy.supabase.co'
-const supabaseKey = 'sb_publishable_ZQuRghep-m7l7M6PXnVJIg_7JRK6oLE'
-
-// Verificar si la clave parece válida
-const isValidSupabaseKey = supabaseKey.startsWith('eyJ')
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvZmplZnJ6aWp6d2VqdWFyeWp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0ODExMjcsImV4cCI6MjA4ODA1NzEyN30.hX3AAU5Bp6uRUXCFCEtV-kNgRh8sYE4OXAMMgVje2d4'
 
 // Verificar estado de la base de datos
 export async function GET(request: NextRequest) {
   try {
-    // Si la clave no tiene el formato correcto
-    if (!isValidSupabaseKey) {
-      return NextResponse.json({ 
-        success: false, 
-        connected: false,
-        tableExists: false,
-        error: 'La clave de Supabase no tiene el formato correcto',
-        message: 'Las claves de Supabase deben empezar con "eyJ" (son JWTs)',
-        instructions: {
-          step1: 'Ve a https://supabase.com/dashboard',
-          step2: 'Selecciona tu proyecto',
-          step3: 'Ve a Settings > API',
-          step4: 'Copia la clave "anon public" (empieza con eyJ...)',
-          step5: 'Actualiza el archivo /src/app/api/reservations/route.ts con la clave correcta'
-        }
-      })
-    }
-    
     // Probar conexión
     const response = await fetch(`${supabaseUrl}/rest/v1/reservations?select=id&limit=1`, {
       method: 'GET',
